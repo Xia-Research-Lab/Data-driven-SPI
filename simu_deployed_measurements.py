@@ -427,7 +427,7 @@ def load_random_valid_image(data_dir, img_size=128):
     from torchvision import transforms
     import random
     
-    valid_dir = os.path.join(data_dir, 'valid')
+    valid_dir = os.path.join(data_dir, 'test')
     if not os.path.exists(valid_dir):
         raise FileNotFoundError(f"Valid directory not found: {valid_dir}")
     

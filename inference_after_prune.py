@@ -44,18 +44,18 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Inference with Pruned SPI Generator')
     
     # Model
-    parser.add_argument('--model_path', type=str, required=True,
+    parser.add_argument('--model_path', default='assets/spi_pruned.pth.gz',type=str,
                         help='Path to pruned model checkpoint')
     parser.add_argument('--patterns_path', type=str, default=None,
                         help='Path to patterns file (optional, will look in same dir as model)')
     
     # Input options (mutually exclusive)
-    input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument('--measurement_file', type=str,
+    #input_group = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument('--measurement_file',default='assets/measurements_2.npy', type=str,
                             help='Path to 1D measurement data (.npy)')
-    input_group.add_argument('--image_path', type=str,
+    parser.add_argument('--image_path', type=str,
                             help='Path to input image (will simulate measurement)')
-    input_group.add_argument('--image_dir', type=str,
+    parser.add_argument('--image_dir', type=str,
                             help='Directory of images for batch processing')
     
     # Output

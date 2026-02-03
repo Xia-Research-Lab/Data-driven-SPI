@@ -1,0 +1,17 @@
+# Core ML Framework
+torch==2.9.1
+torchvision==0.24.1
+pytorch-lightning==2.6.0
+
+# Image Processing & Metrics
+pytorch_ssim==0.1
+Pillow>=10.0.0
+scikit-image==0.25.2
+
+# Scientific Computing
+numpy==2.4.1
+scikit-learn==1.8.0
+
+# Model Utilities
+torchmetrics==1.8.2
+torchsummary==1.5.1
