@@ -46,7 +46,7 @@ def parse_args():
                         help='Path to model checkpoint')
     parser.add_argument('--patterns_file', type=str, default=None,
                         help='Path to save/load patterns (.npy)')
-    parser.add_argument('--output_dir', type=str, default='deploy_output',
+    parser.add_argument('--output_dir', type=str, default='simulated_measurements',
                         help='Directory to save outputs')
     
     # Measurement data
