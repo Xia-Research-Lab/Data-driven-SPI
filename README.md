@@ -47,7 +47,7 @@ python inference_for_deploy.py \
 
 **Expected Output**:
 - Reconstructed 128×128 grayscale image saved to `results/`
-- Benchmark: ~324.7 FPS inference speed (GPU) in H200
+- Benchmark: 324.7 fps with H200 and 580.0 fps on RTX 5090
 
 ---
 
