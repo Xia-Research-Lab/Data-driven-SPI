@@ -1,5 +1,7 @@
 # Data-driven SPI: Reconstruction and Deployment
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Xia-Research-Lab/Data-driven-SPI/blob/main/colab_demo.ipynb)
+
 Single-pixel imaging (SPI) reconstruction with deep learning and model pruning for efficient deployment.
 
 ## Quick Start
