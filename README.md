@@ -19,29 +19,37 @@ conda activate spi
 pip install -r requirements.txt
 ```
 
-### Basic Usage
+### Run Inference (Using Pre-trained Weights)
+
+The `assets/` folder contains pre-trained weights and sample measurement data for quick testing:
 
 ```bash
-# 1. Train the model from scratch
-python train.py --epochs 100 --batch_size 16 --learning_rate 1e-3
+# Run inference with the compressed model and sample measurements
+python inference_for_deploy.py \
+    --model_path assets/spi_pruned.pth.gz \
+    --measurement_file assets/measurements_1.npy \
+    --output_dir results/
 
-# 2. Prune and compress the trained model (50% sparsity, 3.29× compression)
-python deploy_pruned.py --checkpoint checkpoints/best_model.pth \
-                         --prune_ratio 0.5 \
-                         --prune_layers all \
-                         --finetune_epochs 5
-
-# 3. Run inference with the compressed model
-python inference_for_deploy.py --model_path pruned_output/generator_pruned_compressed.pth.gz \
-                               --benchmark \
-                               --num_benchmark_runs 100
+# Benchmark inference speed
+python inference_for_deploy.py \
+    --model_path assets/spi_pruned.pth.gz \
+    --measurement_file assets/measurements_2.npy \
+    --benchmark \
+    --num_benchmark_runs 100
 ```
 
-**Expected Results**:
-- Training PSNR: ~22.39 dB
-- After 50% pruning + fine-tuning: ~22.84 dB
-- Inference speed: 324.7 FPS (GPU)
-- Model size: 194 MB → 59 MB (3.29× compression)
+**Pre-packaged Assets**:
+| File | Description | Size |
+|------|-------------|------|
+| `assets/spi_pruned.pth.gz` | Pruned & compressed model weights | 59 MB |
+| `assets/measurements_1.npy` | Sample measurement data #1 | 8 KB |
+| `assets/measurements_2.npy` | Sample measurement data #2 | 8 KB |
+
+**Expected Output**:
+- Reconstructed 128×128 grayscale image saved to `results/`
+- Benchmark: ~324.7 FPS inference speed (GPU) in H200
+
+---
 
 ## Overview
 
@@ -49,7 +57,37 @@ python inference_for_deploy.py --model_path pruned_output/generator_pruned_compr
 - **Output**: 128×128 grayscale images
 - **Architecture**: U-Net based generator from measurements
 - **Optimization**: 50% pruning + 3.29× compression for deployment
-- **PTQ**: INT4/INT8 PTQ for real world deployment
+- **Dataset**: [CytoImageNet](https://www.kaggle.com/datasets/stanleyhua/cytoimagenet) - 128×128 grayscale cell images
+- [TODO] **PTQ**: INT4/INT8 PTQ for real world deployment
+
+## Dataset Preparation
+
+The `data_prep.py` script provides an integrated pipeline to:
+1. **Download** CytoImageNet dataset from Kaggle
+2. **Resize** images to 128×128 and convert to grayscale
+3. **Split** into train/test/valid sets using hash-based approach (prevents data leakage)
+4. **Organize** files with consistent naming convention
+
+```bash
+# Full pipeline: download from Kaggle + process + split
+python data_prep.py
+
+# Skip download, only process existing dataset
+python data_prep.py --skip-download
+
+# Custom train/test/valid split sizes
+python data_prep.py --train_size 8000 --test_size 1000 --valid_size 200
+```
+
+**Output Structure**:
+```
+cyto128/
+├── train/     # 10000 training images (train_000000.png, ...)
+├── test/      # 1000 test images (test_000000.png, ...)
+└── valid/     # 100 validation images (valid_000000.png, ...)
+```
+
+**Note**: Requires [Kaggle API credentials](https://www.kaggle.com/docs/api) for downloading.
 
 ## Fixed Measurement Patterns
 
@@ -65,28 +103,30 @@ Pre-generated Hadamard/Random binary patterns for consistent measurements.
 
 **Performance**: PSNR ~22-27 dB | SSIM ~0.65-0.85
 
-## Training
+---
+
+## Full Pipeline: Training → Compression → Inference
+
+### Step 1: Training
+
+Train the U-Net generator from scratch on the Cyto128 dataset:
 
 ```bash
 python train.py --epochs 100 --batch_size 16 --learning_rate 1e-3
 ```
 
-## Model Inference
+This trains the model to reconstruct 128×128 images from 2048 binary measurements.
 
-### Original Model (FP32)
+### Step 2: Model Compression (Pruning & Fine-tuning)
+
+Apply 50% pruning to reduce model size while maintaining performance:
+
 ```bash
-python inference.py --checkpoint checkpoints/best_model.pth --image_path test.png
+python deploy_pruned.py --checkpoint checkpoints/best_model.pth \
+                         --prune_ratio 0.5 \
+                         --prune_layers all \
+                         --finetune_epochs 5
 ```
-
-### Pruned Model (Compressed)
-```bash
-python inference_after_prune.py --model_path pruned_output/generator_pruned_compressed.pth.gz \
-                                 --measurement_file measurements.npy
-```
-
-## Model Compression
-
-Pruning reduces model size while maintaining performance through fine-tuning.
 
 ![Pruning](./assets/pruning_visualization.png)
 
@@ -99,30 +139,41 @@ Pruning reduces model size while maintaining performance through fine-tuning.
 | PSNR (original→pruned→finetuned) | 22.39 → 21.44 → 22.84 dB |
 | Inference Speed | 324.7 FPS |
 
-## Pruning & Fine-tuning
+### Step 3: Inference
 
+**Option A: Using Compressed Model (Recommended)**
 ```bash
-python prune.py --checkpoint checkpoints/best_model.pth \
-                 --prune_ratio 0.5 \
-                 --finetune_epochs 5 \
-                 --save_sparse
+python inference_for_deploy.py \
+    --model_path pruned_output/generator_pruned_compressed.pth.gz \
+    --measurement_file measurements.npy \
+    --output_dir results/
 ```
+
+**Option B: Using Original FP32 Model**
+```bash
+python inference.py --checkpoint checkpoints/best_model.pth --image_path test.png
+```
+
+---
 
 ## Project Structure
 
 ```
 .
+├── data_prep.py                  # Integrated dataset preparation tool
 ├── model.py                      # Generator & Discriminator architecture
 ├── losses.py                     # Training losses (binary regularization, adversarial)
 ├── train.py                      # Training script
 ├── deploy_pruned.py              # Pruning & compression pipeline
 ├── inference_for_deploy.py       # Optimized inference for compressed models
-├── ptq.py                        # Post-Training Quantization (INT8/INT4)
 ├── checkpoints/                  # Trained models (194 MB)
 ├── pruned_output/                # Pruned & compressed models (59 MB)
 ├── ptq_output/                   # Quantized models
-├── cyto128/                      # Training dataset
-├── assets/                       # Visualizations & results
+├── cyto128/                      # Cyto128 dataset
+│   ├── train/                    # 10000 training images
+│   ├── test/                     # 1000 test images
+│   └── valid/                    # 100 validation images
+├── assets/                       # Pre-trained weights, sample data & visualizations
 ├── requirements.txt              # Python dependencies
 └── README.md                     # This file
 ```
@@ -142,15 +193,6 @@ torchmetrics==1.8.2
 torchsummary==1.5.1
 ```
 
-### Installation
-
 ```bash
 pip install -r requirements.txt
-```
-
-Or with conda:
-
-```bash
-conda create -n spi python=3.11 pytorch::pytorch pytorch::pytorch-cuda=12.1 pytorch::torchvision -c pytorch -c nvidia
-pip install pytorch-lightning pytorch_ssim scikit-image scikit-learn torchmetrics torchsummary
 ```
